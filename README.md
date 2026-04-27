@@ -1,4 +1,3 @@
-```markdown
 # 在 DigitalOcean 上部署 WireGuard VPN (wg-easy)
 
 ![Platform](https://img.shields.io/badge/Platform-DigitalOcean-0080FF?logo=digitalocean&logoColor=white)
@@ -25,7 +24,7 @@
 
 ## 🚀 第一步：创建 DigitalOcean Droplet（云服务器）
 
-1. 登录 [DigitalOcean 控制台](https://cloud.digitalocean.com/)。
+1. 登录[DigitalOcean 控制台](https://cloud.digitalocean.com/)。
 2. 点击右上角 **Create** → **Droplets**。
 3. **选择机房**：推荐 `San Francisco` → **SFO3**（避开 SFO1，容易不可用）。
 4. **系统镜像**：`Ubuntu 24.04 LTS`。
@@ -52,12 +51,15 @@
 先在 DigitalOcean 控制台找到 Droplet 的 **Public IPv4**。
 
 ### 2.1 SSH 登录
+
 ```bash
 ssh root@你的服务器IP
 ```
+
 首次连接输入 `yes`，然后粘贴 root 密码（输入时不显示字符，正常现象）。
 
 ### 2.2 针对 512 MB 内存方案：创建 Swap 
+
 > [!NOTE]
 > **1 GB 内存方案可跳过此步**，但执行了也不会有副作用。如果不做这一步，512 MB 内存很可能在运行 Docker 后触发 OOM（Out of Memory），导致容器被杀。
 
@@ -70,6 +72,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 sudo sysctl vm.swappiness=10
 echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
 ```
+
 执行完后，服务器即拥有额外的 1 GB 虚拟内存。
 
 ---
@@ -79,6 +82,7 @@ echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
 ```bash
 curl -fsSL https://get.docker.com | bash
 ```
+
 Docker 安装完成后会自动运行。
 
 ---
@@ -110,9 +114,11 @@ sudo docker run -d \
 - 端口映射：`51820/udp` 为 WireGuard 通信端口，`51821/tcp` 为 Web 管理面板端口。
 
 检查容器运行状态：
+
 ```bash
 sudo docker ps
 ```
+
 应能看到 `wg-easy` 容器，状态为 `Up`。
 
 ---
@@ -121,17 +127,21 @@ sudo docker ps
 
 云防火墙默认拦截所有入站流量，必须手动放行端口。
 
-1. 控制台左侧菜单 → **Networking** → **Firewalls** → **Create Firewall**。
-2. **名称**：随意，如 `wg-easy-rules`。
-3. **Apply to Droplet**：搜索并**务必勾选**你的 Droplet（否则规则不会生效）。
-4. **Inbound Rules**（入站规则）：
-   - 保留默认的 `SSH`（TCP 22）。
-   - 点击 **Add another** 添加：
-     - Type: `Custom`，Protocol: `UDP`，Port: `51820`，Destinations: `All IPv4, All IPv6`
-   - 再次点击 **Add another** 添加：
-     - Type: `Custom`，Protocol: `TCP`，Port: `51821`，Destinations: `All IPv4, All IPv6`
-5. **Outbound Rules**：保持默认（允许所有出站）。
-6. 点击 **Create Firewall**。
+**1. 进入设置页面**
+控制台左侧菜单 → **Networking** → **Firewalls** → **Create Firewall**。
+
+**2. 命名与应用**
+- **Name**：随意，如 `wg-easy-rules`。
+- **Apply to Droplet**：搜索并**务必勾选**你的 Droplet（否则规则不会生效）。
+
+**3. 添加入站规则 (Inbound Rules)**
+- 保留默认的 `SSH`（TCP 22）。
+- 点击 **Add another** 添加第一条：Type 选 `Custom`，Protocol 选 `UDP`，Port 填 `51820`，Destinations 选 `All IPv4, All IPv6`
+- 点击 **Add another** 添加第二条：Type 选 `Custom`，Protocol 选 `TCP`，Port 填 `51821`，Destinations 选 `All IPv4, All IPv6`
+
+**4. 确认出站规则与保存**
+- **Outbound Rules** 保持默认（允许所有出站）。
+- 点击底部的 **Create Firewall** 完成创建。
 
 ---
 
@@ -139,7 +149,7 @@ sudo docker ps
 
 浏览器访问 `http://你的服务器IP:51821`，输入你设置的管理员密码登录。
 
-- 点击 **+ New Client** 创建客户端（如 `Phone`, `Laptop`），创建后可**下载配置文件**或**扫描二维码**。
+点击 **+ New Client** 创建客户端（如 `Phone`, `Laptop`），创建后可**下载配置文件**或**扫描二维码**。
 
 > [!TIP]
 > **重要优化：避免内网断流**
@@ -156,17 +166,18 @@ sudo docker ps
 ### 桌面端
 安装官方客户端，导入从后台下载的 `.conf` 文件即可。
 - 下载地址：[WireGuard 官网](https://www.wireguard.com/install/)
-- **Ubuntu 命令行导入**：
-  ```bash
-  sudo nmcli connection import type wireguard file /path/to/your.conf
-  sudo nmcli connection up 配置名
-  ```
+
+**Ubuntu 命令行导入方式**：
+```bash
+sudo nmcli connection import type wireguard file /path/to/your.conf
+sudo nmcli connection up 配置名
+```
 
 ### 手机端
-安装 WireGuard App，直接扫描后台生成的二维码。
+安装 WireGuard App，直接扫描后台生成的二维码即可连接。
 
 ### 验证是否成功
-连接 VPN 后，在终端执行：
+连接 VPN 后，在终端执行以下命令：
 ```bash
 curl ifconfig.me
 ```
@@ -177,41 +188,44 @@ curl ifconfig.me
 ## 🔧 常见问题排查
 
 ### ① Web 面板打不开（`http://IP:51821`）
-- 检查容器是否运行：`sudo docker ps -a`，若已停止则 `sudo docker start wg-easy`。
-- 确认云防火墙已放行 TCP 51821，且**已应用到正确的 Droplet**。
-- 在服务器内部测试：`curl -v telnet://127.0.0.1:51821`，内部通外部不通 → 问题出在云防火墙。
+- 检查容器是否运行：`sudo docker ps -a`，若已停止则执行 `sudo docker start wg-easy`。
+- 确认云防火墙已放行 TCP 51821，且**已正确应用到了该 Droplet 上**。
+- 在服务器内部测试：`curl -v telnet://127.0.0.1:51821`，如果内部通但外部不通，则问题必定出在云防火墙。
 
 ### ② 连上 VPN 但无法访问互联网
-- 检查客户端的 `AllowedIPs` 是否包含 `0.0.0.0/1, 128.0.0.0/1` 或 `0.0.0.0/0`。
-- 检查服务器 IP 转发是否开启：
-  ```bash
-  sysctl net.ipv4.ip_forward
-  ```
-  应输出 `1`。若不是，则执行：
-  ```bash
-  echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-wireguard.conf
-  sudo sysctl -p /etc/sysctl.d/99-wireguard.conf
-  ```
-- 确保云防火墙放行了 UDP 51820。
+**1. 检查客户端 AllowedIPs**
+检查客户端配置文件中的 `AllowedIPs` 是否包含 `0.0.0.0/1, 128.0.0.0/1` 或 `0.0.0.0/0`。
+
+**2. 检查服务器 IP 转发是否开启**
+在终端执行：
+```bash
+sysctl net.ipv4.ip_forward
+```
+应输出 `net.ipv4.ip_forward = 1`。若不是，则执行以下命令开启：
+```bash
+echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-wireguard.conf
+sudo sysctl -p /etc/sysctl.d/99-wireguard.conf
+```
+
+**3. 检查云防火墙 UDP 端口**
+确保云防火墙确实放行了 UDP 51820 端口（注意协议是 UDP 不是 TCP）。
 
 ### ③ 连接 VPN 后本地内网无法访问
-- 请确认已将 `AllowedIPs` 改为 `0.0.0.0/1, 128.0.0.0/1`，而不是 `0.0.0.0/0`。
-- 若仍不行，可尝试在客户端配置中手动追加内网路由（例如 `10.0.0.0/8, 192.168.0.0/16`）。
+- 请确认已将客户端的 `AllowedIPs` 严格改为了 `0.0.0.0/1, 128.0.0.0/1`，而**不是** `0.0.0.0/0`。
+- 若部分特殊内网仍不行，可尝试在客户端配置中手动追加内网路由白名单（例如 `10.0.0.0/8, 192.168.0.0/16`）。
 
 ### ④ 内存不足导致容器频繁重启/停止
-- 查看日志：`sudo docker logs wg-easy`，若出现 `OOM killed` 则是内存不足。
-- 512 MB 方案必须**同时创建 Swap 并加上 `--memory=256m` 限制**。
-- 如无法解决，建议销毁当前 Droplet，重建一台 **1 GB 内存**的方案。
+- 查看容器崩溃日志：`sudo docker logs wg-easy`，若出现 `OOM killed` 则是内存不足。
+- **解决方案**：512 MB 的低配方案必须**同时创建 Swap 并加上 `--memory=256m` 参数限制**。如果实在无法稳定运行，建议销毁当前 Droplet，直接重建一台 **1 GB 内存 ($6/月)** 的机型。
 
 ### ⑤ DigitalOcean 控制台找不到 Droplet
-- 核对登录邮箱是否正确，检查左上角是否选中了正确的 **Team/Project**。
-- 新账户需绑定支付方式才能完整显示资源。
-- 可联系 [DigitalOcean 官方支持](https://cloud.digitalocean.com/support/create)。
+- 核对登录邮箱是否正确，并检查控制台左上角是否选中了正确的 **Team / Project** 视图。
+- 新注册账户如果未绑定支付方式，可能无法完整显示云资源。
+- 账号被风控拦截时，请联系 [DigitalOcean 官方支持](https://cloud.digitalocean.com/support/create) 提交工单。
 
 ---
 
 ## 📄 许可证
 
-本指南涉及的软件（WireGuard、wg-easy、Docker）均遵循各自的开源协议。  
-请遵守当地法律法规，本教程仅供学习交流使用。
-```
+本指南涉及的软件（WireGuard、wg-easy、Docker）均遵循各自的开源协议。
+请遵守当地法律法规，本教程仅供学习交流及个人技术测试使用。
