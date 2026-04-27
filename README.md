@@ -1,11 +1,23 @@
 ```markdown
 # 在 DigitalOcean 上部署 WireGuard VPN (wg-easy)
 
+![Platform](https://img.shields.io/badge/Platform-DigitalOcean-0080FF?logo=digitalocean&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-wg--easy-2496ED?logo=docker&logoColor=white)
+![OS](https://img.shields.io/badge/OS-Ubuntu_24.04-E95420?logo=ubuntu&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+
 > 从零开始，手把手教你用 DigitalOcean VPS + Docker + wg-easy 搭建带 Web 管理面板的 WireGuard，实现个人设备安全互联与科学上网。
+
+✨ **教程亮点**：
+- 🐳 基于 Docker 一键部署，环境干净无污染
+- 🖥️ 自带优雅的 Web 管理面板，扫码即连
+- 💡 针对 512MB 最低配机器提供专属 Swap 与内存限制优化方案
+- 🌐 完美解决连接 VPN 后本地局域网断流问题
 
 ---
 
 ## 📋 前置条件
+
 - 已激活的 DigitalOcean 账户（需绑定 PayPal 或信用卡；新用户有 **$200/60 天** 免费试用金）。
 - 本地 SSH 终端（Mac/Linux 自带；Windows 推荐 PowerShell 或 WSL）。
 
@@ -19,14 +31,19 @@
 4. **系统镜像**：`Ubuntu 24.04 LTS`。
 5. **选择方案**：
    - 推荐 `Basic` → **$6/月**（1 GB RAM / 25 GB SSD），稳定无忧。
-   - 如果预算极紧，也可选 **$4/月**（512 MB / 10 GB），但 ⚠️ **必须按后续步骤创建 Swap 并限制容器内存，否则极易因内存不足导致服务崩溃**。
+   - 如果预算极紧，也可选 **$4/月**（512 MB / 10 GB），但需注意下方警告。
 6. **认证方式**：
    - 切换到 **Password** 选项卡（不用 SSH Key）。
-   - 设置 `root` 密码，**首尾必须是英文字母**（如 `MyVPN!234a`），否则创建时会报错。
+   - 设置 `root` 密码。
 7. **其他选项**：
    - 取消勾选 `Enable automated backups`（额外收费）。
    - 取消勾选 `Enable IPv6`（暂不需要）。
 8. 点击 **Create Droplet**，等待状态变为 `Running`。
+
+> [!WARNING]
+> **关于密码与低配方案**
+> 1. 设置的 `root` 密码，**首尾必须是英文字母**（如 `MyVPN!234a`），否则创建时会报错。
+> 2. 如果选择 512MB 方案，**必须按后续第二步创建 Swap 并限制容器内存，否则极易因内存不足导致服务崩溃**。
 
 ---
 
@@ -38,10 +55,12 @@
 ```bash
 ssh root@你的服务器IP
 ```
-首次连接输入 `yes`，然后粘贴 root 密码（输入时不显示字符，正常）。
+首次连接输入 `yes`，然后粘贴 root 密码（输入时不显示字符，正常现象）。
 
-### 2.2 针对 512 MB 内存方案：创建 Swap（1 GB 方案可跳过，但也可以执行）
-**如果不做这一步，512 MB 内存很可能在运行 Docker 后触发 OOM，导致容器被杀。**
+### 2.2 针对 512 MB 内存方案：创建 Swap 
+> [!NOTE]
+> **1 GB 内存方案可跳过此步**，但执行了也不会有副作用。如果不做这一步，512 MB 内存很可能在运行 Docker 后触发 OOM（Out of Memory），导致容器被杀。
+
 ```bash
 sudo fallocate -l 1G /swapfile
 sudo chmod 600 /swapfile
@@ -51,7 +70,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 sudo sysctl vm.swappiness=10
 echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
 ```
-执行完后即拥有额外的 1 GB 虚拟内存。
+执行完后，服务器即拥有额外的 1 GB 虚拟内存。
 
 ---
 
@@ -87,7 +106,7 @@ sudo docker run -d \
 **参数说明 & 易错点：**
 - `WG_HOST`：**必须**填服务器的公网 IPv4，不能填 `127.0.0.1`。
 - `PASSWORD`：Web 管理面板的登录密码，**首尾必须是英文字母**（如 `MyWG!2024a`）。
-- `--memory=256m --memory-swap=512m`：限制容器物理内存 256 MB，允许交换空间 512 MB，防止 512 MB 主机因内存不足杀死容器。
+- `--memory=256m --memory-swap=512m`：限制容器物理内存 256 MB，允许最多使用 512 MB 交换空间，防止 512 MB 主机因内存不足杀死容器。
 - 端口映射：`51820/udp` 为 WireGuard 通信端口，`51821/tcp` 为 Web 管理面板端口。
 
 检查容器运行状态：
@@ -121,34 +140,37 @@ sudo docker ps
 浏览器访问 `http://你的服务器IP:51821`，输入你设置的管理员密码登录。
 
 - 点击 **+ New Client** 创建客户端（如 `Phone`, `Laptop`），创建后可**下载配置文件**或**扫描二维码**。
-- ⭐ **重要优化（避免内网断流）**：  
-  在客户端列表中点击刚创建的客户端名称，将 `AllowedIPs` 从 `0.0.0.0/0, ::/0` 修改为：
-  ```
-  0.0.0.0/1, 128.0.0.0/1
-  ```
-  然后保存并**重新下载配置文件**。  
-  这样 VPN 只接管外网流量，本地局域网（如 `10.x.x.x` 或 `192.168.x.x`）不受影响。
+
+> [!TIP]
+> **重要优化：避免内网断流**
+> 在客户端列表中点击刚创建的客户端名称，将 `AllowedIPs` 从默认的 `0.0.0.0/0, ::/0` 修改为：
+> `0.0.0.0/1, 128.0.0.0/1`
+> 
+> 然后保存并**重新下载配置文件或刷新二维码**。
+> **原理**：这样 VPN 只接管外网流量，本地局域网（如 `10.x.x.x` 或 `192.168.x.x`）不受影响，避免了连上 VPN 后无法打印局域网打印机或访问 NAS 的问题。
 
 ---
 
 ## 📱 第七步：客户端连接与验证
 
-### 桌面端（macOS / Windows / Linux）
-安装官方 [WireGuard 客户端](https://www.wireguard.com/install/)，导入从后台下载的 `.conf` 文件即可。
+### 桌面端
+安装官方客户端，导入从后台下载的 `.conf` 文件即可。
+- 下载地址：[WireGuard 官网](https://www.wireguard.com/install/)
 - **Ubuntu 命令行导入**：
   ```bash
   sudo nmcli connection import type wireguard file /path/to/your.conf
   sudo nmcli connection up 配置名
   ```
 
-### 手机端（iPhone / Android）
+### 手机端
 安装 WireGuard App，直接扫描后台生成的二维码。
 
 ### 验证是否成功
+连接 VPN 后，在终端执行：
 ```bash
 curl ifconfig.me
 ```
-若显示的 IP 变为你服务器的公网 IP，则 VPN 已生效。
+若显示的 IP 变为你服务器的公网 IP，则 VPN 已成功生效。
 
 ---
 
@@ -156,8 +178,8 @@ curl ifconfig.me
 
 ### ① Web 面板打不开（`http://IP:51821`）
 - 检查容器是否运行：`sudo docker ps -a`，若已停止则 `sudo docker start wg-easy`。
-- 确认云防火墙已放行 TCP 51821，且已应用到正确的 Droplet。
-- 在服务器内部测试：`curl -v telnet://127.0.0.1:51821`，内部通外部不通 → 问题在防火墙。
+- 确认云防火墙已放行 TCP 51821，且**已应用到正确的 Droplet**。
+- 在服务器内部测试：`curl -v telnet://127.0.0.1:51821`，内部通外部不通 → 问题出在云防火墙。
 
 ### ② 连上 VPN 但无法访问互联网
 - 检查客户端的 `AllowedIPs` 是否包含 `0.0.0.0/1, 128.0.0.0/1` 或 `0.0.0.0/0`。
@@ -184,13 +206,12 @@ curl ifconfig.me
 ### ⑤ DigitalOcean 控制台找不到 Droplet
 - 核对登录邮箱是否正确，检查左上角是否选中了正确的 **Team/Project**。
 - 新账户需绑定支付方式才能完整显示资源。
-- 联系 [DigitalOcean 官方支持](https://cloud.digitalocean.com/support/create)。
+- 可联系 [DigitalOcean 官方支持](https://cloud.digitalocean.com/support/create)。
 
 ---
 
 ## 📄 许可证
+
 本指南涉及的软件（WireGuard、wg-easy、Docker）均遵循各自的开源协议。  
 请遵守当地法律法规，本教程仅供学习交流使用。
 ```
-
-现在这整段就是一个完整的 Markdown 文件，没有断裂，可直接粘贴到仓库 `README.md`。如果有细节需要调整，随时告诉我。
